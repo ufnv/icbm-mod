@@ -1,0 +1,50 @@
+site_name: ICBM Escalation Modding
+site_description: Modder's reference for ICBM Escalation - units, weapons, radars, technologies, AI, maps, campaigns
+site_url: https://icbm-mod.com/
+docs_dir: docs
+theme:
+  name: material
+  features:
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - toc.follow
+  palette:
+    - scheme: slate
+      primary: blue grey
+      toggle: {icon: material/weather-sunny, name: Light mode}
+    - scheme: default
+      primary: blue grey
+      toggle: {icon: material/weather-night, name: Dark mode}
+plugins:
+  - search
+markdown_extensions:
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+nav:
+  - Home: index.md
+  - Reference:
+      - 00 Basics: 00-Basics.md
+      - 01 Units: 01-Units.md
+      - 02 Missiles: 02-Missiles.md
+      - 03 Explosions and combat: 03-Explosions.md
+      - 04 Radars: 04-Radars.md
+      - 05 Technologies: 05-Technologies.md
+      - 06 Tech modifiers: 06-Tech-Modifiers.md
+      - 07 Tuning guide: 07-Tuning-Guide.md
+      - 08 AI configuration: 08-AI.md
+      - 09 Maps: 09-Maps.md
+      - 10 Cheats build: 10-Cheats-Build.md
+      - 11 Campaigns and scenarios: 11-Campaigns-and-Scenarios.md
+      - 12 Other configuration files: 12-Config-Files.md
+      - 13 Tutorial missions: 13-Tutorials.md
+      - 14 Explodopedia: 14-Explodopedia.md
+  - Catalogs:
+      - A1 Units: A1-Catalog-Units.md
+      - A2 Missiles: A2-Catalog-Missiles.md
+      - A3 Explosions: A3-Catalog-Explosions.md
+      - A4 Radars: A4-Catalog-Radars.md
+      - A5 Technologies: A5-Catalog-Technologies.md
