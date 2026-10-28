@@ -18,7 +18,7 @@ Contents
 7. [Game rules (lobby defaults)](#7-game-rules-lobby-defaults)
 8. [Display settings](#8-display-settings)
 9. [Building the border and region files: `ProcessBorders`](#9-building-the-border-and-region-files-processborders)
-10. [Making a new map, step by step](#10-making-a-new-map-step-by-step)
+10. [Making a new map, step by step (Cheats build)](#10-making-a-new-map-step-by-step-cheats-build)
 11. [Making a map from a saved game](#11-making-a-map-from-a-saved-game)
 12. [Keys used by saved games and scenarios](#12-keys-used-by-saved-games-and-scenarios)
 13. [Map-specific mods](#13-map-specific-mods)
@@ -128,46 +128,85 @@ companion `X.vec.cmap` (coded version) that the game loads automatically.
 | `ConditionalWaterMap "file.bin" [generate]` | Land paths through each region, so ground units can be blocked by region ownership (e.g. not moving through neutral territory). Regenerate whenever region borders or their numbering change. |
 | `LandingPairs "file.bin" [generate]` | Precomputed pairs of nearby land and sea points, used to embark and land troops by sea. Regenerate when cities or regions change. |
 
-**Generating a mask.** Instead of loading, a mask can be built from a picture:
+**Generating a mask.** Instead of loading, a mask can be built from a picture and, as Earth's are, from an
+SVG drawing of its outlines:
 
 ```
-WaterMap "Maps/MyMap.virtual/watermap.vec"
-  Generate from "Maps/MyMap.virtual/SRC/water.png" [SVG "drawing.svg"]
-  [smooth 36000] [filter 25000] [MapSize 4096 [ShiftX n] [ShiftY n]] [water black]
-  [pfcache "file" [generate]]
+WaterMap "Maps/MyMap.virtual/watermap_16K.vec"
+  Generate from "Maps/MyMap.virtual/SRC/test_16K_ice.svg.view.png" SVG "Maps/MyMap.virtual/SRC/test_16K_ice.svg"
+  [smooth 36000] [filter 25000] [MapSize 16384 [ShiftX n] [ShiftY n]] [water black]
 ```
 
 | Option | Meaning | Default |
 |---|---|---|
-| `from "image.png"` | Mask picture: water is white (`0xFF`); with `water black`, water is black. The picture also carries the land-type information. | — |
-| `SVG "file.svg"` | Take the outlines from this vector drawing instead of tracing the picture (the picture is still needed). | — |
-| `smooth s`, `filter f` | Outline smoothing and small-detail filtering of the traced picture (larger = finer). | 36000, 25000 |
-| `MapSize n` | Grid size (power of 2). `ShiftX`/`ShiftY` shift the grid. | twice the picture height |
-| `pfcache "file" [generate]` | Path-finding cache file. | none |
+| `from "image.png"` | The mask picture. A pixel is water when the average of its red, green and blue is above 200 (white); with `water black`, below 56 (black). The picture's height sets the grid size. | — |
+| `SVG "file.svg"` | Take the outlines from this drawing (the file [`EditSVG`](#editing-masks-interactively-editsvg) edits) instead of tracing them from the picture. The picture is still needed: export it from the SVG's `.view.svg`. | — |
+| `smooth s`, `filter f` | Smoothing and small-detail filtering of outlines traced from the picture (larger = finer); not used with `SVG`. | 36000, 25000 |
+| `MapSize n` | Grid size, a power of 2. `ShiftX`/`ShiftY` shift the grid. | twice the picture height |
+| `water black` | Water is black in the picture, land white (as in an exported `.view.png`). | water is white |
 
-Run the map once in single player: the game shows the traced paths for checking and writes the `.vec` and
-`.vec.cmap` files under *Documents/ICBM/maps/…*. Move them into the map's folder, remove the `Generate …`
-part and delete the generated copies from *Documents* (files there take priority over mods).
+`pfcache "file" [generate]` after a mask is read but does nothing in 1.1.5.
 
-> **Which `generate` options work where.** The water masks (`WaterMap`, `WaterMapNoIce`, `WaterMapLand`),
-> the city list (`FromFile … Generate From`), city relocation and the AI cache generate in the normal game.
-> `ConditionalWaterMap`, `LandingPairs`, `TerrainTypeMap … Generate`, `HeightMap … generate`, city models
-> (`ModelsPath … Generate`), `EditSVG` and `ProcessBorders` need the [Cheats build](10-Cheats-Build.md).
+Put the `Generate …` line in (remove its `//`) and start the map in single player. The game draws the new mask
+for checking (its coded map as the overlay; with the overlay off, its outlines in yellow) and writes `X.vec` and
+`X.vec.cmap` into *Documents/My Games/ICBM-Escalation* under the same path as in the map file (for the line
+above, `Documents/My Games/ICBM-Escalation/Maps/MyMap.virtual/watermap_16K.vec`; ICBM.CFG's `DataPath` instead
+when it is set). Quit, move both files into your mod's folder, put the `Generate …` line behind `//` again and
+delete the copies from *Documents*: files there are read before the mods' and would hide your mod's.
+
+A run that generates a mask (or a [simple ownership picture](#simple-ownership-picture)) leaves out the regions and
+the cities' processing: generate nothing else in the same run.
+
+> **Which `generate` options work where.** The normal game generates the water masks, the simple ownership
+> picture, the city list (`FromFile … Generate From`), city relocation (`relocate … generate`) and the AI cache.
+> `ConditionalWaterMap … generate`, `LandingPairs … generate`, `TerrainTypeMap … Generate`, `HeightMap …
+> generate`, city models (`ModelsPath … generate`), `EditSVG` and `ProcessBorders` work only in the
+> [Cheats build](10-Cheats-Build.md). The normal game reads these lines without an error but does nothing;
+> worse, a `generate` left after `ConditionalWaterMap`, `LandingPairs`, `HeightMap` or `TerrainTypeMap` makes it
+> load nothing for that line. Put every one of them behind `//` before publishing.
 
 ### Editing masks interactively: `EditSVG`
 
 ```
-EditSVG "Maps/X.virtual/Src/water_16K.svg" [Size n] [Save "out.svg"]
-  [Second "Maps/X.virtual/Src/water_16K_ice.svg" [Save "out2.svg"]]
+EditSVG "Maps/MyMap.virtual/SRC/test_16K.svg" [Size n] [Save "out.svg"]
+  [Second "Maps/MyMap.virtual/SRC/test_16K_ice.svg" [Save "out2.svg"]]
   [Mask WaterMap | WaterMapNoIce | WaterMapLand]
 ```
 
-Opens an SVG outline in an on-map editor. `Second` edits a linked outline at the same time (e.g. with and
-without ice); `Mask` draws an existing mask underneath for reference. Controls: left-click a vertex to move
-it; left-click an edge to add a vertex; right-click a vertex to delete it; Shift+left-click adds a square
-segment; Alt ignores the main outline and Ctrl the second one while clicking; **R** detects the segment
-hierarchy and saves. Saving also writes `<file>.view.svg` (with a black background and closed polar areas)
-to open in a vector editor and export the matching PNG used by `Generate … SVG`.
+In the Cheats build, opens the outlines of an SVG drawing on the battle map (flat view) for editing. Earth's drawings are in
+`Maps/EarthRRUltraV3.virtual/SRC/`: `test_16K_ice.svg` for `WaterMap` (the sea ice counted as land),
+`test_16K.svg` for `WaterMapNoIce` (the sea under the ice is water), `test_16K_land.svg` for `WaterMapLand`.
+
+| Part | Meaning |
+|---|---|
+| `EditSVG "file.svg"` | The drawing to edit. Every path and every subpath of it is one closed outline; curves are reduced to their end points, colours are ignored. Its outlines are drawn in yellow, lakes (once known, see **R**) in orange. |
+| `Save "file.svg"` | Where to save it. Default: the file itself. |
+| `Second "file.svg" [Save …]` | A second drawing edited together with the first (drawn in blue): the outlines with and without the sea ice are the same away from the poles, so a vertex moved in both moves in both. |
+| `Mask WaterMap` / `WaterMapNoIce` / `WaterMapLand` | Draws that mask, as the map file has already loaded it, in red underneath for reference — e.g. `WaterMap` while editing the land map. |
+| `Size n` | The width the drawing's coordinates are divided by. Default: twice the drawing's height. |
+
+**Mouse and keys** (a vertex under the cursor snaps within 16 screen pixels):
+
+| Action | Does |
+|---|---|
+| Left drag a vertex | moves it |
+| Left drag an edge | puts a new vertex there and moves it |
+| Right click a vertex | deletes it (an outline left with one vertex goes) |
+| Shift + left click on empty space | a new small square outline, to drag into shape |
+| Shift held while letting a dragged vertex go on another outline's edge | splices the two outlines there (joins them, or splits one in two) |
+| Alt held | leaves the first drawing alone (acts on `Second` only) |
+| Ctrl held | leaves the `Second` drawing alone |
+| **R** | works out which outline lies inside which (lakes in land, islands in lakes) and saves |
+
+There is no undo: back the drawings up before a session. Every change saves the drawing(s) at once. Press **R**
+before you finish: until then every outline counts as land, lakes too. Outlines must not cross each other or
+themselves. The editor has no end: quit the game when done and put the `EditSVG` lines behind `//`.
+
+**What is saved.** The drawing itself, its outlines as white paths (a land outline with its lakes as subpaths),
+and `<file>.view.svg`: the same on a black background, with the outlines that cross the map's left or right edge
+(the polar caps) taken round along its top or bottom. The game writes no picture. Open `<file>.view.svg` in a vector
+editor (Inkscape), export it as a PNG of the drawing's own size and name it `<file>.view.png`: that picture and the
+drawing are what `Generate from "<file>.view.png" SVG "<file>" water black` reads.
 
 ### Terrain types
 
@@ -296,8 +335,10 @@ OwnershipMap "Maps/MyMap.virtual/ownership.vec"
 ```
 
 Paint with a hard (non-antialiased) brush using exactly the `Player` colours; every area must touch its
-neighbours along pixel edges, not only at corners. Run the map once to generate the `.vec`, then remove the
-`Generate` line. Each faction is then one region.
+neighbours along pixel edges, not only at corners; a stray pixel or one touching only at a corner can crash
+the run. If it does, put all but one `Player` behind `//` and add them back one at a time to find the colour at
+fault. Run the map once to generate the `.vec` (it goes into *Documents*, as the masks of §3), then remove the
+`Generate` line. Each faction is then one region. This works in the normal game too.
 
 ---
 
@@ -504,58 +545,283 @@ These values become the defaults of the game-setup screen for this map; the host
 
 ## 9. Building the border and region files: `ProcessBorders`
 
-The region files of §4 are produced from a vector drawing of the borders. `ProcessBorders` runs one or more
-of these steps when the map is loaded (each step is normally commented out once its files exist); they
-work in the [Cheats build](10-Cheats-Build.md).
+The region files of §4 are made by the steps of `ProcessBorders`. Each step runs when the map is loaded, in the
+[Cheats build](10-Cheats-Build.md) only (the normal game reads the lines and does nothing). Put one step at a
+time in (remove its `//`), run the map, quit, put it back behind `//` and go on with the next:
+[§10](#10-making-a-new-map-step-by-step-cheats-build) walks through them.
 
 ```
 ProcessBorders
-  ReadSVG "SRC/V7.svg" Generate "SRC/V7_split.txt" [SaveEdited "SRC/V7_split_mod.txt"]
-  EditPoints "SRC/V7_split.txt" [SaveEdited "SRC/V7_split_mod.txt"]
-  GenerateSplit Load "SRC/V7_split.txt" Generate "SRC/V7_split.bin" Names "SRC/V7_segment_names.txt"
-                [SplitCenterPoints "file"]
-  GenerateOwnership LoadBin "SRC/V7_split.bin" [GenerateDimmable] LoadNames "SRC/V7_segment_names.txt"
-                    SaveDefaults "SRC/V7_default" Generate "SRC/V7_split.vec" [MAP_SIZE 4096]
-  GenerateDefaults Names "V7_default.txt" Vec "V7_default.vec"
+//ReadSVG "Maps/MyMap.virtual/SRC/borders.svg" Generate "Maps/MyMap.virtual/SRC/V7_split.txt" SaveEdited "Maps/MyMap.virtual/SRC/V7_split_mod.txt"
+//EditPoints "Maps/MyMap.virtual/SRC/V7_split.txt" SaveEdited "Maps/MyMap.virtual/SRC/V7_split_mod.txt"
+//GenerateSplit Load "Maps/MyMap.virtual/SRC/V7_split.txt" Generate "Maps/MyMap.virtual/SRC/V7_split.bin" Names "Maps/MyMap.virtual/SRC/V7_segment_names.txt"
+//GenerateOwnership LoadBin "Maps/MyMap.virtual/SRC/V7_split.bin" GenerateDimmable LoadNames "Maps/MyMap.virtual/SRC/V7_segment_names.txt" SaveDefaults "Maps/MyMap.virtual/SRC/V7_default" Generate "Maps/MyMap.virtual/SRC/V7_split.vec"
+//GenerateDefaults Names "Maps/MyMap.virtual/V7_default.txt" Vec "Maps/MyMap.virtual/V7_default.vec"
 ```
+
+`ProcessBorders` must come after the `OwnershipMap` block (with its `Player` lines), and that block must load:
+until your own region files exist, leave it pointing at Earth's.
 
 | Step | Does |
 |---|---|
-| `ReadSVG … Generate …` | Converts the border drawing into a point-and-edge file. |
-| `EditPoints … [SaveEdited …]` | Opens that file in the on-map editor. |
-| `GenerateSplit` | Splits the territory into numbered segments (`.bin`) and writes the segment numbering for the region list. The centre of each segment is written to `<bin>.points.txt` (or `SplitCenterPoints`) and can be reused. |
-| `GenerateOwnership` | Builds the region territories (`.vec` + `.vec.cmap`), writes `<SaveDefaults>.txt` (every region with a random owner, to edit) and `<SaveDefaults>.vec`. `GenerateDimmable` marks border lines inside a faction so they are drawn faintly. `MAP_SIZE` is the grid size (power of 2). |
-| `GenerateDefaults` | Rebuilds the faction borders (`.vec`, `.vec.cmap`) for the region owners in the given default file. |
+| `ReadSVG "drawing.svg" Generate "graph.txt" [SaveEdited "graph_mod.txt"]` | Optional. Reads a drawing of the borders (each path a line, curves sampled, colours ignored), joins the points that lie on each other into a graph, writes it to `Generate` at once and opens the border editor on it. The drawing's coordinates are taken as map coordinates, so it must be drawn 1 × 1 units (x and y from 0 to 1). |
+| `EditPoints "graph.txt" [SaveEdited "graph_mod.txt"]` | The border editor (below). Saves to `SaveEdited`, else to the file itself. |
+| `GenerateSplit Load "graph.txt" Generate "split.bin" Names "names.txt" [SplitCenterPoints "file"]` | Naming the regions (below): each click inside a closed area makes it the next region and writes `split.bin`, the names file and the centre points (`<split.bin>.points.txt`, or `SplitCenterPoints`). |
+| `GenerateOwnership LoadBin "split.bin" [GenerateDimmable] LoadNames "names.txt" SaveDefaults "base" Generate "regions.vec" [MAP_SIZE 4096]` | Builds the regions' territories (`regions.vec`, the `Ownership` file of §4), writes `base.txt` (every region with a **random** owner among the `Player`s, to edit) and `base.vec` with its `.vec.cmap` (the `OwnershipMap` file). `GenerateDimmable` adds to `split.bin` which border lines lie inside one faction (drawn faintly) — needed by `ConditionalWaterMap`: always use it. `MAP_SIZE` is the grid size (power of 2). |
+| `GenerateDefaults Names "default.txt" Vec "default.vec"` | Writes the region owners as they are when the game starts into `default.txt`, and the faction borders for them into `default.vec` (`.vec.cmap`). |
 
-File formats:
+Every step writes into *Documents/My Games/ICBM-Escalation* under the path given, as the masks of §3 do; move the
+files into your mod.
 
-* **Point-and-edge file** (`V7_split.txt`): `P x y` lines (points, numbered from 0 in order), then for each
-  point `FOR n` followed by `E m length` lines (an edge to point *m*).
-* **Centre points** (`V7_split.bin.points.txt`): `Point x y` per segment, in segment order (a `// comment`
-  with the region name is allowed).
+### The border editor (`EditPoints`)
 
----
+The borders are a graph of points and straight lines on the battle map. A point snaps to an existing one within
+1/4096 of the map.
 
-## 10. Making a new map, step by step
+| Action | Does |
+|---|---|
+| Left click on empty space | puts a point there and starts a line from it (or goes on with the line being drawn) |
+| Left click on an existing point | starts the line there, or ends the line being drawn on it |
+| Left click on the line's own first point | closes it |
+| Left click on an existing line | puts a point into it and ends the line being drawn there |
+| Right click | deletes the one line (between two points) nearest the cursor; points left without lines go. Does nothing while a line is being drawn. |
 
-The shipped map files carry these steps as comments.
+The point or line the cursor would snap to is marked: green while a line is being drawn, red otherwise. A line is
+saved when it is ended and after each deletion; a line still being drawn is not. There is no undo (back the file
+up now and then) and no end: quit the game when done.
 
-1. **Texture.** Use an existing texture pack (`TextureMap "Maps/EARTH256K"`) or make your own folder with
-   `map.e5i`/`map.e5p`, `default.*` and `default_small.png`.
-2. **Water.** Draw the sea mask, add `Generate from …` to `WaterMap` (and to `WaterMapNoIce` and
-   `WaterMapLand`), run the map once in single player and keep the generated files (§3).
-3. **Regions.** Either paint an ownership picture (§4, one region per faction) or draw the region borders
-   and run the `ProcessBorders` steps (§9). Write the region list with the economic shares and the default
-   assignment, then the `Player` blocks.
-4. **Cities.** Make the CSV list; run once with `relocate "…" generate` to move coastal cities onto land.
-   Use `rename` for display names.
-5. **Derived data.** Generate `ConditionalWaterMap`, `LandingPairs` and the `TerrainTypeMap` (Cheats
-   build, §3), then the AI cache: `AICache "…" generate from "SRC/AIConfig.txt"`. Repeat these whenever regions or cities change.
-6. **Setup.** Starting units (`Default AvailableUnits`), `DefaultEnemy` pairs, lobby defaults (§7) and
-   display settings (§8).
-7. Remove every `generate` and delete the generated copies from *Documents/ICBM/maps* before publishing.
+Rules for the borders: every region must be a closed area — no loose ends, no lines crossing (join them at a
+point instead), no area wholly inside another. Regions cover land and the sea near it as you draw them; the
+coasts come from the water masks, so a border may run out into the sea.
 
----
+### Naming the regions (`GenerateSplit`)
+
+The game does not know which area is which region until you click them. The cursor shows the name of the next
+region; a left click inside a closed area makes it that region. The first click is region 0 and takes the first
+line of the names file, the next region 1 and the second line, and so on. A click with no line left adds `"Segment
+N"` to the names file (with Production, Science and Espionage 1).
+
+Prepare the names file beforehand to have the right names shown as you click — one line per region, numbered
+from 0 in the order you will click them:
+
+```
+"Alaska" GDP 1.0 0
+"Canada" GDP 1.0 1
+"Greenland" GDP 1.0 2
+END
+```
+
+Each click also rewrites `split.bin` and the centre points file. When the map is loaded again the clicks are
+replayed from that file, so the work can be resumed in a later run, and after a border change (a new graph from
+`EditPoints`) the same clicks name the regions again. There is no undo: to take a click back, quit, delete its
+line (the last) from the centre points file and run again.
+
+### File formats
+
+* **Graph** (`V7_split.txt`): `P x y` lines (points in map coordinates, numbered from 0 in order), then for each
+  point `FOR n` followed by `E m length` lines (a line to point *m*; the length is not checked). A point without
+  lines is dropped. The smallest useful graph, a square in the middle of the map to start drawing from:
+
+  ```
+  P 0.5 0.5
+  P 0.6 0.5
+  P 0.6 0.6
+  P 0.5 0.6
+  FOR 0
+    E 1 0.1
+  FOR 1
+    E 2 0.1
+  FOR 2
+    E 3 0.1
+  FOR 3
+    E 0 0.1
+  ```
+* **Centre points** (`V7_split.bin.points.txt`): `Point x y` per region, in click order (a `// comment` with the
+  region name is allowed).
+* **Names** (`V7_segment_names.txt`, the `MultiCountry` file of §4): one line per region,
+  `"Name" GDP g n …` or `"Name" Production p Science s Espionage e n …`. The numbers after the shares are the
+  areas (in click order, from 0) that make the region: a region of several areas — an island group — lists them
+  all (`"Ecuador" … 27 28`). Keep them in rising order. `GenerateSplit` writes the long form.
+* **Defaults** (`V7_default.txt`): §4. `GenerateDefaults` writes plain `"Region" faction` lines only: add
+  `RENAME`, `VARIANT` and the other options afterwards, and never run it on a file that has them.
+
+## 10. Making a new map, step by step (Cheats build)
+
+A new map of the Earth with your own regions, factions and cities, made with the
+[Cheats build](10-Cheats-Build.md) on top of Earth's map: its texture (`TextureMap "Maps/EARTH256K"`), height map
+and terrain types stay as they are. The shipped map file carries the same steps as comments.
+
+**How a step runs.** Each step is a line of the map file put in (its `//` removed) for one run: start the game,
+pick the map in the new-game screen, start it, check the result, quit. Generated files go to
+*Documents/My Games/ICBM-Escalation* under the path the line names (ICBM.CFG's `DataPath` instead when it is
+set). After each step move them into your mod's folder at the same path, delete what is left in *Documents* (it
+would hide your mod's files) and put the line behind `//` again. Do one step per run, in this order: each needs
+the files of the ones before it.
+
+Want only new factions on Earth's regions? Do steps 1, 6, 9 and 10 (the `Player` blocks, who owns each region,
+the AI cache, the setup); Earth's borders, cities and masks stay.
+
+### Step 1. Your copy of Earth's map
+
+1. Make a mod (a folder under the game's `MODS/` with an `info.txt`, [12 §2](12-Config-Files.md#2-mods-infotxt))
+   with a `Maps/` folder.
+2. Copy the game's `Maps/EarthRRUltra.txt` to `MODS/<mod>/Maps/MyMap.txt` and the folder
+   `Maps/EarthRRUltraV3.virtual` to `MODS/<mod>/Maps/MyMap.virtual`.
+3. In `MyMap.txt`, replace every `Maps/EarthRRUltraV3.virtual/` (in any case) by `Maps/MyMap.virtual/`; leave
+   `Maps/EARTH256K` and `Maps/Events` alone. Change the `Name` and `Description` lines (§2): the map is listed
+   under its first `Name`.
+4. Enable the mod and check that the map appears in the map list and starts.
+
+### Step 2. Water and land masks (optional)
+
+Earth's coasts need no change for a map of the Earth: skip this step unless you want to change the sea (a new
+canal, a strait closed). A changed mask means every later step must be made again.
+
+1. **Edit the outlines.** Put the `EditSVG` lines in (§3), e.g.
+
+   ```
+   EditSVG "Maps/MyMap.virtual/Src/test_16K.svg" Save "Maps/MyMap.virtual/Src/test_16K.svg"
+           Second "Maps/MyMap.virtual/Src/test_16K_ice.svg" Save "Maps/MyMap.virtual/Src/test_16K_ice.svg"
+           Mask WaterMapLand
+   ```
+
+   for the sea maps, or `EditSVG "…/test_16K_land.svg" … Mask WaterMap` for the land map. Edit, press **R**,
+   quit. The drawings are saved in *Documents* with their `.view.svg`.
+2. **Export the pictures.** Open each changed `.view.svg` in Inkscape and export it as PNG at the drawing's own size
+   to `<name>.svg.view.png` beside it.
+3. **Generate the masks.** Put the `Generate from …` lines of `WaterMap`, `WaterMapNoIce` and `WaterMapLand` in (the
+   shipped file has them, with `water black`), run, check the overlay, quit. Move the drawings, the pictures and
+   the new `.vec` and `.vec.cmap` files into the mod.
+
+### Step 3. Draw the region borders
+
+Put `ProcessBorders` and its `EditPoints` line in (§9):
+
+```
+ProcessBorders
+  EditPoints "Maps/MyMap.virtual/SRC/V7_split.txt" SaveEdited "Maps/MyMap.virtual/SRC/V7_split_mod.txt"
+```
+
+Start from Earth's own border graph (`SRC/V7_split.txt`, the line above) to change its regions, or from the
+small square of §9's *File formats* in a new `V7_split.txt` to draw all of them yourself. (With a drawing of the
+borders made 1 × 1 units, `ReadSVG` makes the graph from it instead.) Keep the `OwnershipMap` block as it is:
+Earth's region files load until yours replace them in step 5.
+
+Draw the borders with the editor (§9): every region one closed area, no loose ends, no crossings. Each finished
+line is saved in `V7_split_mod.txt` (in *Documents*). Quit when done, copy it into the mod's `SRC/` as
+`V7_split.txt` (keep the old one as a backup) and put `EditPoints` behind `//`.
+
+### Step 4. Name the regions
+
+1. Optionally write `SRC/V7_segment_names.txt` beforehand: your region names in the order you will click them
+   (§9). Earth's file has Earth's 150 names and its own order: replace it when the regions are new.
+2. Empty or delete `SRC/V7_split.bin.points.txt`, or the game replays Earth's clicks.
+3. Put the `GenerateSplit` line in, run, and click inside each region in turn: the cursor names the next one.
+   The work is saved after every click; a later run goes on where you left off.
+4. Quit. Move `V7_split.bin`, `V7_split.bin.points.txt` and `V7_segment_names.txt` into the mod's `SRC/`. Put
+   `GenerateSplit` behind `//`.
+5. In `V7_segment_names.txt`, join regions that should be one (list their numbers on one line, delete the other
+   lines) and set the economy: each region's `Production`, `Science` and `Espionage` are its shares of its
+   faction's, adding up to 1 within a faction (§4). They can be changed at any time later without making anything
+   again.
+
+### Step 5. Build the regions
+
+1. Put the `GenerateOwnership` line in, with `GenerateDimmable`:
+
+   ```
+   GenerateOwnership LoadBin "Maps/MyMap.virtual/SRC/V7_split.bin" GenerateDimmable LoadNames "Maps/MyMap.virtual/SRC/V7_segment_names.txt" SaveDefaults "Maps/MyMap.virtual/SRC/V7_default" Generate "Maps/MyMap.virtual/SRC/V7_split.vec"
+   ```
+
+   Run and quit. It writes `V7_split.vec` (`.vec.cmap`), `V7_default.txt` (random owners), `V7_default.vec`
+   (`.vec.cmap`) and a new `V7_split.bin`.
+2. Move them into the mod: `MyMap.virtual/V7_split.bin`, `V7_split.vec` (with its `.vec.cmap`),
+   `V7_default.vec` (with its `.vec.cmap`) and `V7_default.txt`, and `SRC/V7_segment_names.txt` to
+   `MyMap.virtual/V7_segment_names.txt`. Put `GenerateOwnership` and `ProcessBorders` behind `//`.
+3. The `OwnershipMap` block now names your files (the paths of step 1):
+
+   ```
+   OwnershipMap "Maps/MyMap.virtual/V7_default.vec"
+     MultiCountry "Maps/MyMap.virtual/V7_segment_names.txt"
+     Borders "Maps/MyMap.virtual/V7_split.bin"
+     Ownership "Maps/MyMap.virtual/V7_split.vec"
+     Default "Maps/MyMap.virtual/V7_default.txt"
+   ```
+
+   Start the map: your regions are drawn, with random owners.
+
+### Step 6. Factions and who owns each region
+
+1. **The factions** are the `Player` lines of the `OwnershipMap` block (§4), at most 10: their names, colours,
+   portraits and `Events FromFile` scripts (Earth's scripts fit any faction: they use the common AI script). A
+   faction's name is what `DefaultEnemy`, `AIConfig.txt` and event scripts refer to.
+2. **The owners and the faction borders.** Put `ProcessBorders` and its `GenerateDefaults` line in (§9). Then
+   either write `V7_default.txt` by hand — `"Region" faction` per region, the faction a `Player`'s number from 0
+   (§4) — and start the map, or pick the map in the new-game screen, give the regions to the factions there as
+   they should start, and start the game. Either way the game writes the owners it started with to
+   `V7_default.txt` and the faction borders for them to `V7_default.vec` (`.vec.cmap`). Move them into the mod and
+   put the lines behind `//`. Do it again whenever the owners change.
+3. `RENAME` and `VARIANT` sections go into `V7_default.txt` only after this: `GenerateDefaults` drops them.
+
+### Step 7. Cities
+
+A city belongs to the faction whose region it stands in; cities on nobody's land go at the start. Earth's list
+(`earth_cities.csv`) works for any regions: `MaxPerPlayer` limits the cities per faction.
+
+* **Your own list:** write it in the CSV format of §5 (geographic or `Absolute` coordinates) as `SRC/cities.csv`
+  and read it with `FromFile "Maps/MyMap.virtual/cities.csv" Generate From "Maps/MyMap.virtual/SRC/cities.csv"`:
+  the game writes the final list to the first file.
+* **Cities on the coast:** `relocate "Maps/MyMap.virtual/cities.reloc.txt" generate` moves cities lying on water
+  into the land and writes their new places (§5).
+* **City models:** a city whose name is not Earth's has no 3D model. `ModelsPath
+  "Maps/MyMap.virtual/CityModels" generate` makes the missing ones.
+
+The three can run together; move the files into the mod and put the `generate` options behind `//`. Use `rename`
+lines for names shown differently.
+
+### Step 8. Ground paths and landings
+
+Put in `generate` after both lines and run once:
+
+```
+ConditionalWaterMap "Maps/MyMap.virtual/Conditional.bin" generate
+LandingPairs "Maps/MyMap.virtual/landing_pairs.bin" generate
+```
+
+`ConditionalWaterMap` is the land units' paths across the regions' borders (it needs the `GenerateDimmable`
+`V7_split.bin` of step 5); `LandingPairs` the points where troops embark and land (they need the cities). Move
+both files into the mod.
+
+### Step 9. The AI cache
+
+1. Edit `SRC/AIConfig.txt` (§6): any line naming a faction (`for "North America"`) must name one of yours, or go.
+2. Put in `AICache "Maps/MyMap.virtual/ai_cache_new.bin" generate from "Maps/MyMap.virtual/SRC/AIConfig.txt"`
+   and run. It takes a long time. Move the file into the mod.
+3. Check it: in the Cheats build **Ctrl + 0 … 9** and **Alt + 0 … 8** show the AI's places of each kind
+   ([10 §1](10-Cheats-Build.md#1-key-combinations)).
+
+### Step 10. Setup
+
+`DefaultEnemy` pairs with your factions' names (delete Earth's), starting units and technologies (§6), lobby
+defaults (§7), display settings (§8). Play a game against the computer.
+
+### Step 11. Publish
+
+Put every `generate`, `EditSVG` and `ProcessBorders` line behind `//`. Delete your map's files from
+*Documents/My Games/ICBM-Escalation/Maps* and play the map from the mod alone once. The mod needs `MyMap.txt` and
+`MyMap.virtual/` with the masks, the region files, the cities, `Conditional.bin`, `landing_pairs.bin`, the AI
+cache, the city models and the events; `SRC/` holds only sources.
+
+### What to make again after a change
+
+| You changed | Make again |
+|---|---|
+| The masks (step 2) | everything from step 3: borders near the coasts, regions, cities on the coast, paths, landings, AI cache |
+| Borders (step 3) | steps 4 (the saved clicks replay; click any new region), 5, 6 (owners and faction borders), 8, 9 |
+| Owners only | step 6 (`GenerateDefaults`) |
+| Region names, economy | nothing |
+| Cities | city models, landing pairs, AI cache |
+| Faction names | `AIConfig.txt`, `DefaultEnemy`, event scripts naming them; the AI cache if `AIConfig.txt` names factions |
 
 ## 11. Making a map from a saved game
 
@@ -680,7 +946,8 @@ compares the data before the game starts.
   `rename` and the relocation file. Region names in the default file are matched ignoring case.
 * **Regenerate the derived files** (`ConditionalWaterMap`, `LandingPairs`, AI cache) after changing regions
   or cities, or ground movement, landings and AI placement will not match the map.
-* **Generated files in *Documents/ICBM/maps*** take priority over the map's own folder. Delete them after
-  moving the files into your mod.
+* **Generated files in *Documents/My Games/ICBM-Escalation*** take priority over the mod's files of the same path.
+  Delete them after moving the files into your mod.
+* **A `generate` left in a published map** makes the normal game skip that file (§3).
 * **At most 10 `Player` blocks.**
 * An unknown word stops loading the rest of the map file (§1); check the line number in the message.
